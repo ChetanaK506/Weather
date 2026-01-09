@@ -1,4 +1,4 @@
-name: Frontend CI/CD
+name: CI
 
 on:
   push:
@@ -7,88 +7,94 @@ on:
     branches: [ main, developer ]
 
 jobs:
-  build-and-test:
+  frontend:
+    name: Frontend  Test, Build, Artifact
     runs-on: ubuntu-latest
-    name: Build & Test
-
     strategy:
       matrix:
         node-version: [18.x]
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        cache-dependency-path: myapp/package-lock.json
-    
-    - name: Install dependencies
-      working-directory: ./myapp
-      run: npm ci
-    
-    - name: Lint code
-      working-directory: ./myapp
-      run: npm run lint 2>/dev/null || echo "Linting skipped - no lint script"
-    
-    - name: Run tests with coverage
-      working-directory: ./myapp
-      run: npm test -- --coverage --watchAll=false --passWithNoTests
-    
-    - name: Build
-      working-directory: ./myapp
-      run: npm run build
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        files: ./myapp/coverage/coverage-final.json
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-    
-    - name: Archive build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build
-        path: myapp/build/
-        retention-days: 7
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: myapp/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./myapp
+        run: npm ci
+
+      - name: Lint (optional)
+        working-directory: ./myapp
+        run: npm run lint || echo "No lint script"
+
+      - name: Run tests (coverage)
+        working-directory: ./myapp
+        run: npm test -- --coverage --watchAll=false --passWithNoTests
+
+      - name: Build production bundle
+        working-directory: ./myapp
+        run: npm run build
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./myapp/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+
+      - name: Archive build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: myapp/build/
+          retention-days: 7
 
   lighthouse:
+    name: Frontend  Lighthouse
     runs-on: ubuntu-latest
-    name: Lighthouse Performance
-
+    needs: frontend
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run Lighthouse CI
-      uses: treosh/lighthouse-ci-action@v9
-      with:
-        configPath: './lighthouserc.json'
-        uploadArtifacts: true
-        temporaryPublicStorage: true
-      continue-on-error: true
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: myapp/build/
+
+      - name: Run Lighthouse CI (temporary public upload)
+        uses: treosh/lighthouse-ci-action@v9
+        with:
+          configPath: './lighthouserc.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+        continue-on-error: true
 
   deploy:
-    needs: build-and-test
+    name: Deploy  GitHub Pages
     runs-on: ubuntu-latest
-    name: Deploy to GitHub Pages
+    needs: [frontend, lighthouse]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build
-        path: myapp/build/
-    
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./myapp/build/
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: myapp/build/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./myapp/build/
