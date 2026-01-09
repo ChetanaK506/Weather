@@ -4,6 +4,7 @@ function App() {
   return (
     <div className='app'>
       <Weather/>
+      console.log('Today weather');
     </div>
   );
 }
