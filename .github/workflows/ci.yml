@@ -1,44 +1,33 @@
-name: CI
+name: React API CI
 
 on:
   push:
-    branches: [ main, developer ]
+    branches:
+      - main
+      - developer
   pull_request:
-    branches: [ main, developer ]
+    branches:
+      - main
+      - developer
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x]
-
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        cache-dependency-path: myapp/package-lock.json
-    
-    - name: Install dependencies
-      working-directory: ./myapp
-      run: npm ci
-    
-    - name: Run tests
-      working-directory: ./myapp
-      run: npm test -- --coverage --watchAll=false
-    
-    - name: Build
-      working-directory: ./myapp
-      run: npm run build
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        files: ./myapp/coverage/coverage-final.json
-        flags: unittests
-        name: codecov-umbrella
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests (mocked APIs)
+        run: npm test -- --watchAll=false
+
+      - name: Build app
+        run: npm run build
