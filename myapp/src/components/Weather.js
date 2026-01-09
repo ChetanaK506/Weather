@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import './Weather.css';
 
 import search_icon from '../assets/search.png';
@@ -15,7 +15,7 @@ function Weather() {
   const [inputCity, setInputCity] = useState('');
   const [error, setError] = useState(null);
 
-  const getWeatherIcon = (description) => {
+  const getWeatherIcon = useCallback((description) => {
     const lower = description.toLowerCase();
 
     if (lower.includes('clear')) return clear_icon;
@@ -25,9 +25,9 @@ function Weather() {
     if (lower.includes('snow')) return snow_icon;
 
     return clear_icon;
-  };
+  }, []);
 
-  const search = async (cityName) => {
+  const search = useCallback(async (cityName) => {
     try {
       const response = await fetch(`https://goweather.xyz/weather/${cityName}`);
       const data = await response.json();
@@ -50,11 +50,11 @@ function Weather() {
       setError('Error fetching data.');
       setWeatherData(null);
     }
-  };
+  }, [getWeatherIcon]);
 
   useEffect(() => {
     search(city);
-  }, [city]);
+  }, [city, search]);
 
   const handleSearchClick = () => {
     if (inputCity.trim() !== '') {
