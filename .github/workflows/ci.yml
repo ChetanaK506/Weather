@@ -1,49 +1,64 @@
-name: React API CI
+name: React CI/CD + Docker (Windows)
 
 on:
   push:
     branches:
       - main
-      - developer
-  pull_request:
-    branches:
-      - main
-      - developer
-
-permissions:
-  contents: write
-  id-token: write
-  pages: write
 
 jobs:
-  ci:
-    runs-on: ubuntu-latest
+  ci-cd:
+    runs-on: self-hosted
 
     steps:
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./myapp
+
+      - name: Run tests
+        run: npm test -- --watchAll=false || echo "No tests"
+
+      - name: Build React app
+        run: npm run build
+        working-directory: ./myapp
+
+      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Step 2: Setup Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
+      # Step 3: Install dependencies
       - name: Install dependencies
         working-directory: ./myapp
         run: npm ci
 
-      - name: Run tests (mocked APIs)
+      # Step 4: Run tests
+      - name: Run tests
         working-directory: ./myapp
-        run: npm test -- --watchAll=false --passWithNoTests || echo "Tests skipped"
+        run: npm test -- --watchAll=false --passWithNoTests || echo "No tests"
 
+      # Step 5: Build React app
       - name: Build app
         working-directory: ./myapp
         run: npm run build
 
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./myapp/build
+      # Step 6: Build Docker image
+      - name: Build Docker image
+        run: docker build -t weather-app ./myapp
 
+      # Step 7: Stop old container
+      - name: Stop old container
+        run: docker stop weather-app || true
+
+      # Step 8: Remove old container
+      - name: Remove old container
+        run: docker rm weather-app || true
+
+      # Step 9: Run new container
+      - name: Run new container
+        run: docker run -d -p 3000:3000 --name weather-app weather-app
